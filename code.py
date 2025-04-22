@@ -38,61 +38,6 @@ midi_usb = adafruit_midi.MIDI(
 led = digitalio.DigitalInOut(board.GP25)  # activity indicator
 led.direction = digitalio.Direction.OUTPUT
 
-
-class MyButton:
-    pin = None,
-    button = None
-    note = 0
-    def __init__(self, pin, note):
-        self.pin = pin
-        self.note = note
-        btn = digitalio.DigitalInOut(pin)
-        btn.direction = digitalio.Direction.INPUT
-        btn.pull = digitalio.Pull.UP
-        self.button = Debouncer(btn)
-
-MyButtons = [
-    MyButton(
-        board.GP21,
-        60,
-    )
-]
-
-knob_count = 1  # Set the total number of potentiometers used
-
-# Create the input objects list for potentiometers
-knob = []
-for k in range(knob_count):
-    knobs = AnalogIn(
-        getattr(board, "A{}".format(k))
-    )  # get pin # attribute, use string formatting
-    knob.append(knobs)
-
-#  assignment of knobs to cc numbers
-knob_cc_number = [
-    7
-]
-
-# CC range list defines the characteristics of the potentiometers
-#  This list contains the input object, minimum value, and maximum value for each knob.
-knob_cc_range = [
-    (0, 127)  # knob 0: C2 to B5: 49-note keyboard
-]
-
-print("---Grand Central MIDI Knobs---")
-print("   USB MIDI channel: {}".format(MIDI_USB_channel))
-# print("   TRS MIDI channel: {}".format(CLASSIC_MIDI_channel))
-
-# Initialize cc_value list with current value and offset placeholders
-knob_cc_value = []
-for _ in range(knob_count):
-    knob_cc_value.append((0, 0))
-    
-knob_last_cc_value = []
-
-for _ in range(knob_count):
-    knob_last_cc_value.append((0, 0))
-
 #  range_index converts an analog value (ctl) to an indexed integer
 #  Input is masked to 8 bits to reduce noise then a scaled hysteresis offset
 #  is applied. The helper returns new index value (idx) and input
@@ -115,8 +60,49 @@ def sign(x):  # determine the sign of x
     else:
         return -1
 
+class MyButton:
+    pin = None,
+    button = None
+    note = 0
+    def __init__(self, pin, note):
+        self.pin = pin
+        self.note = note
+        btn = digitalio.DigitalInOut(pin)
+        btn.direction = digitalio.Direction.INPUT
+        btn.pull = digitalio.Pull.UP
+        self.button = Debouncer(btn)
+
+MyButtons = [
+    MyButton(
+        board.GP21,
+        60,
+    )
+]
+
+class MyKnob:
+    adc = None
+    cc_number = 0
+    cc_range = (0, 127)
+    cc_value = (0, 0)
+    cc_value_last = (0, 0)
+    def __init__(self, pin, cc_number, cc_range):
+        self.pin = pin
+        self.cc_number = cc_number
+        self.cc_range = cc_range
+        self.adc = AnalogIn( pin )
+
+MyKnobs = [
+    MyKnob(
+        board.GP26,
+        7,
+        (0, 127)
+    )
+]
+
+print("   USB MIDI channel: {}".format(MIDI_USB_channel))
+# print("   TRS MIDI channel: {}".format(CLASSIC_MIDI_channel))
+        
 while True:
-    # read all the knob values
     for btn in MyButtons:
         btn.button.update()
         
@@ -125,28 +111,26 @@ while True:
         #else:
         #    print("pressed")
         if btn.button.fell:
-            midi_usb.send(NoteOn(btn.note, 127))
+            midi_usb.send( NoteOn( btn.note, 127 ) )
             print('Just pressed')
         if btn.button.rose:
-            midi_usb.send(NoteOff(btn.note, 0))
+            midi_usb.send( NoteOff( btn.note, 0 ) )
             print('Just released')
-        
-    for i in range(knob_count):
-        knob_cc_value[i] = range_index(
-            knob[i].value,
-            (knob_cc_range[i][1] - knob_cc_range[i][0] + 1),
-            knob_cc_value[i][0],
-            knob_cc_value[i][1],
+    for knob in MyKnobs:
+        knob.cc_value = range_index(
+            knob.adc.value,
+            ( knob.cc_range[1] - knob.cc_range[0] + 1 ),
+            knob.cc_value[0],
+            knob.cc_value[1],
         )
-        # print( knob_cc_value[i] )
-        if knob_cc_value[i] != knob_last_cc_value[i]:  # only send if it changed
+        print( knob.cc_value )
+        if knob.cc_value != knob.cc_value_last:  # only send if it changed
             # Form a MIDI CC message and send it:
-            midi_usb.send(ControlChange(knob_cc_number[i], knob_cc_value[i][0] + knob_cc_range[i][0]))
+            midi_usb.send(ControlChange(knob.cc_number, knob.cc_value[0] + knob.cc_range[0]))
             # classic_midi.send(
             #     ControlChange(knob_cc_number[i], knob_cc_value[i][0] + knob_cc_range[i][0])
             # )
-            knob_last_cc_value[i] = knob_cc_value[i]
+            knob.cc_value_last = knob.cc_value
             led.value = True
-
-    time.sleep(0.01)
+    time.sleep(0.1)
     led.value = False
