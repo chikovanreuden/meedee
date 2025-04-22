@@ -93,7 +93,7 @@ class MyKnob:
 
 MyKnobs = [
     MyKnob(
-        board.A1,
+        board.GP26,
         7,
         (0, 127)
     )
