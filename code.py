@@ -9,6 +9,7 @@
 import time
 import board
 import busio
+import rotaryio
 from simpleio import map_range
 from analogio import AnalogIn
 import digitalio
@@ -79,6 +80,24 @@ MyButtons = [
     )
 ]
 
+class MyREncoder:
+    pinA = None
+    pinB = None
+    button_state = None
+    last_position = None
+    encoder = None
+    def __init__(self, pinA, pinB):
+        self.pinA = pinA
+        self.pinB = pinB
+        self.encoder = rotaryio.IncrementalEncoder(self.pinA, self.pinB)
+
+MyREncoders = [
+    MyREncoder(
+        board.GP2,
+        board.GP3
+    )
+];
+
 class MyKnob:
     adc = None
     cc_number = 0
@@ -101,8 +120,9 @@ MyKnobs = [
 
 print("   USB MIDI channel: {}".format(MIDI_USB_channel))
 # print("   TRS MIDI channel: {}".format(CLASSIC_MIDI_channel))
-        
+
 while True:
+
     for btn in MyButtons:
         btn.button.update()
         
@@ -112,10 +132,22 @@ while True:
         #    print("pressed")
         if btn.button.fell:
             midi_usb.send( NoteOn( btn.note, 127 ) )
-            print('Just pressed')
+            #print('Just pressed')
         if btn.button.rose:
             midi_usb.send( NoteOff( btn.note, 0 ) )
-            print('Just released')
+            #print('Just released')
+    for rencoder in MyREncoders:
+        current_position = rencoder.encoder.position
+        position_change = current_position - rencoder.last_position
+        if position_change > 0:
+            for _ in range(position_change):
+                print(current_position)
+            
+        elif position_change < 0:
+            for _ in range(-position_change):
+                print(current_position)
+            
+        rencoder.last_position = current_position
     for knob in MyKnobs:
         knob.cc_value = range_index(
             knob.adc.value,
@@ -123,7 +155,7 @@ while True:
             knob.cc_value[0],
             knob.cc_value[1],
         )
-        print( knob.cc_value )
+        #print( knob.cc_value )
         if knob.cc_value != knob.cc_value_last:  # only send if it changed
             # Form a MIDI CC message and send it:
             midi_usb.send(ControlChange(knob.cc_number, knob.cc_value[0] + knob.cc_range[0]))
@@ -132,5 +164,5 @@ while True:
             # )
             knob.cc_value_last = knob.cc_value
             led.value = True
-    time.sleep(0.1)
+    time.sleep(0.01)
     led.value = False
