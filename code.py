@@ -5,7 +5,8 @@
 #  for USB MIDI and optional UART MIDI
 #  Reads analog inputs, sends out MIDI CC values
 #   with Kattni Rembor and Jan Goolsbey for range and hysteresis code
-
+print("Starting")
+print("Loading Modules..." , end = " " )
 import time
 import board
 import busio
@@ -18,23 +19,51 @@ import adafruit_midi  # MIDI protocol encoder/decoder library
 from adafruit_midi.control_change import ControlChange
 from adafruit_midi.note_off import NoteOff
 from adafruit_midi.note_on import NoteOn
-
 from adafruit_debouncer import Debouncer
+from adafruit_ssd1306 import SSD1306_I2C
+from rainbowio import colorwheel
+import neopixel
+print("ok")
 
+print("Loading Program")
+
+print("neopixel init...", end = " " )
+pixel_pin = board.GP23
+num_pixels = 1
+neo = neopixel.NeoPixel(pixel_pin, num_pixels, brightness=0.1, auto_write=False)
+
+RED = (255, 0, 0)
+YELLOW = (255, 150, 0)
+GREEN = (0, 255, 0)
+CYAN = (0, 255, 255)
+BLUE = (0, 0, 255)
+PURPLE = (180, 0, 255)
+ORANGE = (255, 200, 0)
+NIL = (0, 0, 0)
+
+neo.fill(RED)
+neo.show()
+print("ok")
+
+print("i2c init...", end = " " )
+i2c = busio.I2C(scl=board.GP17, sda=board.GP16)
+print("ok")
+print("oled init...", end = " " )
+oled = SSD1306_I2C(128, 32, i2c)
+oled.fill(0)
+oled.text('MEEDEE', 48, 0, 1)
+oled.text('WEEEEE', 48, 10, 1)
+oled.show()
+print("ok")
+
+print("midi_usb init...", end = " " )
 # pick your USB MIDI out channel here, 1-16
 MIDI_USB_channel = 1
-# pick your classic MIDI channel for sending over UART serial TX/RX
-# CLASSIC_MIDI_channel = 2
-
 midi_usb = adafruit_midi.MIDI(
     midi_out=usb_midi.ports[1],
     out_channel=MIDI_USB_channel - 1
 )
-#  use DIN-5 or TRS MIDI jack on TX/RX for classic MIDI
-# midi_uart = busio.UART(board.TX, board.RX, baudrate=31250, timeout=0.001)  # initialize UART
-# classic_midi = adafruit_midi.MIDI(
-#     midi_out=midi_uart, midi_in=midi_uart, out_channel=CLASSIC_MIDI_channel - 1, debug=False
-# )
+print("ok")
 
 led = digitalio.DigitalInOut(board.GP25)  # activity indicator
 led.direction = digitalio.Direction.OUTPUT
@@ -60,12 +89,37 @@ def sign(x):  # determine the sign of x
         return 1
     else:
         return -1
+        
+def knob_neo( value ):
+    if not value:
+        return (0,0,0)
+    red = 0
+    green = 255
+    blue = 0
+    if value <= 63:
+        red = ( 256 / 64 ) * value
+        green = 255
+    elif value > 63:
+        red = 255
+        green = 255 - (( 256 / 64 ) * (value-64))
+    # print((red, green, blue));
+    return (red, green, blue)
+
+def update_display(rows):
+    oled.fill(0)
+    row_count = 0
+    for row in rows:
+        oled.text(row, 0, row_count, 1)
+        row_count += 10
+    oled.show()
 
 class MyButton:
+    name = "Button"
     pin = None,
     button = None
     note = 0
-    def __init__(self, pin, note):
+    def __init__(self, name, pin, note):
+        self.name = name
         self.pin = pin
         self.note = note
         btn = digitalio.DigitalInOut(pin)
@@ -73,56 +127,146 @@ class MyButton:
         btn.pull = digitalio.Pull.UP
         self.button = Debouncer(btn)
 
+print("MyButtons init...", end = " " )
 MyButtons = [
     MyButton(
-        board.GP21,
-        60,
+        "Button",
+        board.GP1,
+        61,
+    ),
+    MyButton(
+        "Button",
+        board.GP2,
+        62,
+    ),
+    MyButton(
+        "Button",
+        board.GP3,
+        63,
+    ),
+    MyButton(
+        "Button",
+        board.GP4,
+        64,
+    ),
+    MyButton(
+        "Button",
+        board.GP5,
+        65,
+    ),
+    MyButton(
+        "Button",
+        board.GP6,
+        66,
+    ),
+    MyButton(
+        "Button",
+        board.GP18,
+        69,
     )
 ]
+print("ok")
 
 class MyREncoder:
+    name = "Encoder"
     pinA = None
     pinB = None
-    button_state = None
-    last_position = None
+    last_position = 0
     encoder = None
-    def __init__(self, pinA, pinB):
+    value = 0
+    value_min = 0
+    value_max = 127
+    step_size = 1
+    
+    def __init__(self, name, pinA, pinB, value_min, value_max, step_size = 1):
+        self.name = name
         self.pinA = pinA
         self.pinB = pinB
+        self.value_min = value_min
+        self.value_max = value_max
+        self.step_size = step_size
+        self.value = int( self.value_min + ( ( self.value_max - self.value_min) / 2 ) )
         self.encoder = rotaryio.IncrementalEncoder(self.pinA, self.pinB)
+        
+    def setValue(self, value):
+        if value <= self.value_min:
+            self.value = self.value_min
+        elif value >= self.value_max:
+            self.value = self.value_max
+        else:
+            self.value = value
+        return self.value
+        
+    def getValue(self):
+        return self.value
+        
+    def plus(self):
+        if self.value < self.value_max:
+            self.setValue( self.value + 1 * self.step_size )
+        return self.value
+        
+    def minus(self):
+        if self.value > self.value_min:
+            self.setValue( self.value - 1 * self.step_size )
+        return self.value
 
+print("MyREncoders init...", end = " " )
 MyREncoders = [
     MyREncoder(
-        board.GP2,
-        board.GP3
+        "Encoder",
+        board.GP19,
+        board.GP20,
+        0,
+        127,
+        3
     )
 ];
 
 class MyKnob:
+    name = "Knobby"
     adc = None
     cc_number = 0
     cc_range = (0, 127)
     cc_value = (0, 0)
     cc_value_last = (0, 0)
-    def __init__(self, pin, cc_number, cc_range):
+    channel = 0
+    def __init__(self, name, pin, cc_number, cc_range, channel):
+        self.name = name
         self.pin = pin
         self.cc_number = cc_number
         self.cc_range = cc_range
         self.adc = AnalogIn( pin )
+        self.channel = channel
+print("ok")
 
+print("MyKnobs init...", end = " " )
 MyKnobs = [
     MyKnob(
+        "Knobby",
         board.GP26,
         7,
-        (0, 127)
+        (0, 127),
+        0
+    ),
+    MyKnob(
+        "Knobby",
+        board.GP27,
+        7,
+        (0, 127),
+        1
+    ),
+    MyKnob(
+        "Knobby",
+        board.GP28,
+        7,
+        (0, 127),
+        2
     )
 ]
+print("ok")
 
-print("   USB MIDI channel: {}".format(MIDI_USB_channel))
-# print("   TRS MIDI channel: {}".format(CLASSIC_MIDI_channel))
-
+print("Starting Main Loop")
 while True:
-
     for btn in MyButtons:
         btn.button.update()
         
@@ -132,22 +276,44 @@ while True:
         #    print("pressed")
         if btn.button.fell:
             midi_usb.send( NoteOn( btn.note, 127 ) )
-            #print('Just pressed')
+            # print('pressed {0}'.format(btn.note))
+            update_display([
+                btn.name,
+                "value: pressed"
+            ])
         if btn.button.rose:
             midi_usb.send( NoteOff( btn.note, 0 ) )
-            #print('Just released')
+            # print('released {0}'.format(btn.note))
+            update_display([
+                btn.name,
+                "value: released"
+            ])
+
     for rencoder in MyREncoders:
         current_position = rencoder.encoder.position
         position_change = current_position - rencoder.last_position
         if position_change > 0:
             for _ in range(position_change):
-                print(current_position)
-            
+                rencoder.plus()
+                #print(rencoder.value)
         elif position_change < 0:
             for _ in range(-position_change):
-                print(current_position)
-            
+                rencoder.minus()
+                #print(rencoder.value)
+        if position_change != 0:
+            midi_usb.send(
+                ControlChange(
+                    7,
+                    rencoder.value
+                ),
+                15
+            )
+            update_display([
+                rencoder.name,
+                "value: " + str(rencoder.value)
+            ])
         rencoder.last_position = current_position
+
     for knob in MyKnobs:
         knob.cc_value = range_index(
             knob.adc.value,
@@ -155,14 +321,23 @@ while True:
             knob.cc_value[0],
             knob.cc_value[1],
         )
-        #print( knob.cc_value )
-        if knob.cc_value != knob.cc_value_last:  # only send if it changed
-            # Form a MIDI CC message and send it:
-            midi_usb.send(ControlChange(knob.cc_number, knob.cc_value[0] + knob.cc_range[0]))
-            # classic_midi.send(
-            #     ControlChange(knob_cc_number[i], knob_cc_value[i][0] + knob_cc_range[i][0])
-            # )
+        if knob.cc_value != knob.cc_value_last:
+            midi_usb.send(
+                ControlChange(
+                    knob.cc_number,
+                    knob.cc_value[0] + knob.cc_range[0]
+                ),
+                knob.channel
+            )
             knob.cc_value_last = knob.cc_value
+            #print("knob {0}".format(knob.channel))
+            neo.fill( knob_neo( knob.cc_value[0] ) )
+            neo.show()
             led.value = True
+            update_display([
+                knob.name,
+                "value: " + str(knob.cc_value[0])
+            ])
+
     time.sleep(0.01)
     led.value = False
