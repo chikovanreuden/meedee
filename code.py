@@ -83,12 +83,8 @@ def range_index(ctl, ctrl_max, old_idx, offset):
         )  # edit 0.25 to adjust slices
     return idx, offset
 
-
 def sign(x):  # determine the sign of x
-    if x >= 0:
-        return 1
-    else:
-        return -1
+    return 1 if x >= 0 else 0
         
 def knob_neo( value ):
     if not value:
@@ -130,37 +126,37 @@ class MyButton:
 print("MyButtons init...", end = " " )
 MyButtons = [
     MyButton(
-        "Button",
+        "Button 61",
         board.GP1,
         61,
     ),
     MyButton(
-        "Button",
+        "Button 62",
         board.GP2,
         62,
     ),
     MyButton(
-        "Button",
+        "Button 63",
         board.GP3,
         63,
     ),
     MyButton(
-        "Button",
+        "Button 64",
         board.GP4,
         64,
     ),
     MyButton(
-        "Button",
+        "Button 65",
         board.GP5,
         65,
     ),
     MyButton(
-        "Button",
+        "Button 66",
         board.GP6,
         66,
     ),
     MyButton(
-        "Button",
+        "Button 69",
         board.GP18,
         69,
     )
@@ -242,21 +238,21 @@ print("ok")
 print("MyKnobs init...", end = " " )
 MyKnobs = [
     MyKnob(
-        "Knobby",
+        "Knobby ch1cc7",
         board.GP26,
         7,
         (0, 127),
         0
     ),
     MyKnob(
-        "Knobby",
+        "Knobby ch2cc7",
         board.GP27,
         7,
         (0, 127),
         1
     ),
     MyKnob(
-        "Knobby",
+        "Knobby ch3cc7",
         board.GP28,
         7,
         (0, 127),
