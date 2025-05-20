@@ -5,7 +5,8 @@
 #  for USB MIDI and optional UART MIDI
 #  Reads analog inputs, sends out MIDI CC values
 #   with Kattni Rembor and Jan Goolsbey for range and hysteresis code
-print("Starting")
+VERSION="0.1.0"
+print("Starting v" + VERSION)
 print("Loading Modules..." , end = " " )
 import time
 import board
@@ -21,7 +22,6 @@ from adafruit_midi.note_off import NoteOff
 from adafruit_midi.note_on import NoteOn
 from adafruit_debouncer import Debouncer
 from adafruit_ssd1306 import SSD1306_I2C
-from rainbowio import colorwheel
 import neopixel
 print("ok")
 
@@ -51,8 +51,9 @@ print("ok")
 print("oled init...", end = " " )
 oled = SSD1306_I2C(128, 32, i2c)
 oled.fill(0)
-oled.text('MEEDEE', 48, 0, 1)
-oled.text('WEEEEE', 48, 10, 1)
+oled.text("MEEDEE", 48, 0, 1)
+oled.text("WEEEEE", 48, 10, 1)
+oled.text( VERSION, 48, 20, 1)
 oled.show()
 print("ok")
 
@@ -101,6 +102,10 @@ def knob_neo( value ):
     # print((red, green, blue));
     return (red, green, blue)
 
+def update_neo( newValue ):
+    neo.fill( newValue )
+    neo.show()
+
 def update_display(rows):
     oled.fill(0)
     row_count = 0
@@ -114,10 +119,12 @@ class MyButton:
     pin = None,
     button = None
     note = 0
-    def __init__(self, name, pin, note):
+    value = 0
+    def __init__(self, name, pin, note, value = 106):
         self.name = name
         self.pin = pin
         self.note = note
+        self.value = value
         btn = digitalio.DigitalInOut(pin)
         btn.direction = digitalio.Direction.INPUT
         btn.pull = digitalio.Pull.UP
@@ -129,36 +136,43 @@ MyButtons = [
         "Button 61",
         board.GP1,
         61,
+        None
     ),
     MyButton(
         "Button 62",
         board.GP2,
         62,
+        None
     ),
     MyButton(
         "Button 63",
         board.GP3,
         63,
+        None
     ),
     MyButton(
         "Button 64",
         board.GP4,
         64,
+        None
     ),
     MyButton(
         "Button 65",
         board.GP5,
         65,
+        None
     ),
     MyButton(
         "Button 66",
         board.GP6,
         66,
+        None
     ),
     MyButton(
         "Button 69",
         board.GP18,
         69,
+        None
     )
 ]
 print("ok")
@@ -173,8 +187,7 @@ class MyREncoder:
     value_min = 0
     value_max = 127
     step_size = 1
-    
-    def __init__(self, name, pinA, pinB, value_min, value_max, step_size = 1):
+    def __init__(self, name, pinA, pinB, value_min, value_max, value = 106, step_size = 1):
         self.name = name
         self.pinA = pinA
         self.pinB = pinB
@@ -182,7 +195,7 @@ class MyREncoder:
         self.value_max = value_max
         self.step_size = step_size
         self.value = int( self.value_min + ( ( self.value_max - self.value_min) / 2 ) )
-        self.encoder = rotaryio.IncrementalEncoder(self.pinA, self.pinB)
+        self.encoder = rotaryio.IncrementalEncoder(self.pinA, self.pinB, 4)
         
     def setValue(self, value):
         if value <= self.value_min:
@@ -214,7 +227,8 @@ MyREncoders = [
         board.GP20,
         0,
         127,
-        3
+        106,
+        1
     )
 ];
 
@@ -287,6 +301,7 @@ while True:
 
     for rencoder in MyREncoders:
         current_position = rencoder.encoder.position
+        print(rencoder.encoder.position)
         position_change = current_position - rencoder.last_position
         if position_change > 0:
             for _ in range(position_change):
@@ -327,9 +342,8 @@ while True:
             )
             knob.cc_value_last = knob.cc_value
             #print("knob {0}".format(knob.channel))
-            neo.fill( knob_neo( knob.cc_value[0] ) )
-            neo.show()
             led.value = True
+            update_neo( knob_neo( knob.cc_value[0] ) )
             update_display([
                 knob.name,
                 "value: " + str(knob.cc_value[0])
