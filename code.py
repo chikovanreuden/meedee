@@ -5,7 +5,7 @@
 #  for USB MIDI and optional UART MIDI
 #  Reads analog inputs, sends out MIDI CC values
 #   with Kattni Rembor and Jan Goolsbey for range and hysteresis code
-VERSION="0.1.0"
+VERSION="0.2.0"
 print("Starting v" + VERSION)
 print("Loading Modules..." , end = " " )
 import time
@@ -23,6 +23,7 @@ from adafruit_midi.note_on import NoteOn
 from adafruit_debouncer import Debouncer
 from adafruit_ssd1306 import SSD1306_I2C
 import neopixel
+import math
 print("ok")
 
 print("Loading Program")
@@ -113,7 +114,8 @@ def update_display(rows):
         oled.text(row, 0, row_count, 1)
         row_count += 10
     oled.show()
-
+    
+print("MyButtons init...", end = " " )
 class MyButton:
     name = "Button"
     pin = None,
@@ -130,53 +132,53 @@ class MyButton:
         btn.pull = digitalio.Pull.UP
         self.button = Debouncer(btn)
 
-print("MyButtons init...", end = " " )
 MyButtons = [
-    MyButton(
-        "Button 61",
-        board.GP1,
-        61,
-        None
-    ),
-    MyButton(
-        "Button 62",
-        board.GP2,
-        62,
-        None
-    ),
-    MyButton(
-        "Button 63",
-        board.GP3,
-        63,
-        None
-    ),
-    MyButton(
-        "Button 64",
-        board.GP4,
-        64,
-        None
-    ),
-    MyButton(
-        "Button 65",
-        board.GP5,
-        65,
-        None
-    ),
-    MyButton(
-        "Button 66",
-        board.GP6,
-        66,
-        None
-    ),
-    MyButton(
-        "Button 69",
-        board.GP18,
-        69,
-        None
-    )
+    # MyButton(
+    #     "Button 61",
+    #     board.GP1,
+    #     61,
+    #     None
+    # ),
+    # MyButton(
+    #     "Button 62",
+    #     board.GP2,
+    #     62,
+    #     None
+    # ),
+    # MyButton(
+    #     "Button 63",
+    #     board.GP3,
+    #     63,
+    #     None
+    # ),
+    # MyButton(
+    #     "Button 64",
+    #     board.GP4,
+    #     64,
+    #     None
+    # ),
+    # MyButton(
+    #     "Button 65",
+    #     board.GP5,
+    #     65,
+    #     None
+    # ),
+    # MyButton(
+    #     "Button 66",
+    #     board.GP6,
+    #     66,
+    #     None
+    # ),
+    # MyButton(
+    #     "Button 69",
+    #     board.GP18,
+    #     69,
+    #     None
+    # )
 ]
 print("ok")
 
+print("MyREncoders init...", end = " " )
 class MyREncoder:
     name = "Encoder"
     pinA = None
@@ -219,19 +221,20 @@ class MyREncoder:
             self.setValue( self.value - 1 * self.step_size )
         return self.value
 
-print("MyREncoders init...", end = " " )
 MyREncoders = [
-    MyREncoder(
-        "Encoder",
-        board.GP19,
-        board.GP20,
-        0,
-        127,
-        106,
-        1
-    )
+    # MyREncoder(
+    #     "Encoder",
+    #     board.GP19,
+    #     board.GP20,
+    #     0,
+    #     127,
+    #     106,
+    #     1
+    # )
 ];
+print("ok")
 
+print("MyKnob init...", end = " " )
 class MyKnob:
     name = "Knobby"
     adc = None
@@ -247,9 +250,7 @@ class MyKnob:
         self.cc_range = cc_range
         self.adc = AnalogIn( pin )
         self.channel = channel
-print("ok")
 
-print("MyKnobs init...", end = " " )
 MyKnobs = [
     MyKnob(
         "Knobby ch1cc7",
@@ -264,15 +265,84 @@ MyKnobs = [
         7,
         (0, 127),
         1
-    ),
-    MyKnob(
-        "Knobby ch3cc7",
-        board.GP28,
-        7,
-        (0, 127),
-        2
     )
 ]
+print("ok")
+
+print("MUX init...", end = " " )
+
+class MyMuxChannel:
+    name = "Muxxy"
+    cc_number = 0
+    cc_range = (0, 127)
+    cc_value = (0, 0)
+    cc_value_last = (0, 0)
+    channel = 0
+    muxCh = 0
+    def __init__(self, name, pin, cc_number, cc_range, channel, muxCh):
+        self.name = name
+        self.pin = pin
+        self.cc_number = cc_number
+        self.cc_range = cc_range
+        self.channel = channel
+        self.muxCh = muxCh
+        self.control = digitalio.DigitalInOut( self.pin )
+        self.control.direction = digitalio.Direction.OUTPUT
+        self.control.value = False
+    def getAnalogValue(self):
+        return readmux( self.muxCh )
+
+MyMuxChannels = [
+    MyMuxChannel(
+        "Muxxy01",
+        board.GP13,
+        7,
+        (0, 127),
+        2,
+        0
+    ),
+    MyMuxChannel(
+        "Muxxy02",
+        board.GP12,
+        7,
+        (0, 127),
+        3,
+        1
+    )
+]
+
+mux_sig_pin = board.GP28
+mux_sig = AnalogIn( mux_sig_pin )
+
+muxChannel = [
+    [0,0,0,0], # - 0
+    [1,0,0,0], # - 1
+    [0,1,0,0], # - 2
+    [1,1,0,0], # - 3
+    [0,0,1,0], # - 4
+    [1,0,1,0], # - 5
+    [0,1,1,0], # - 6
+    [1,1,1,0], # - 7
+    [0,0,0,1], # - 8
+    [1,0,0,1], # - 9
+    [0,1,0,1], # - 10
+    [1,1,0,1], # - 11
+    [0,0,1,1], # - 12
+    [1,0,1,1], # - 13
+    [0,1,1,1], # - 14
+    [1,1,1,1] # - 15
+]
+
+def readmux (channel):
+    for x in range(math.ceil(len(MyMuxChannels) / 4)) :
+        val = muxChannel[channel][x]
+        if val == 0:
+            val = False
+        elif val == 1:
+            val = True
+        MyMuxChannels[x].control.value = val
+    return mux_sig.value
+
 print("ok")
 
 print("Starting Main Loop")
@@ -347,6 +417,30 @@ while True:
             update_display([
                 knob.name,
                 "value: " + str(knob.cc_value[0])
+            ])
+            
+    for ch in MyMuxChannels:
+        ch.cc_value = range_index(
+            ch.getAnalogValue(),
+            ( ch.cc_range[1] - ch.cc_range[0] + 1 ),
+            ch.cc_value[0],
+            ch.cc_value[1],
+        )
+        if ch.cc_value != ch.cc_value_last:
+            midi_usb.send(
+                ControlChange(
+                    ch.cc_number,
+                    ch.cc_value[0] + ch.cc_range[0]
+                ),
+                ch.channel
+            )
+            ch.cc_value_last = ch.cc_value
+            #print("knob {0}".format(knob.channel))
+            led.value = True
+            update_neo( knob_neo( ch.cc_value[0] ) )
+            update_display([
+                ch.name,
+                "value: " + str(ch.cc_value[0])
             ])
 
     time.sleep(0.01)
