@@ -133,143 +133,68 @@ class MyButton:
         self.button = Debouncer(btn)
 
 MyButtons = [
-    # MyButton(
-    #     "Button 61",
-    #     board.GP1,
-    #     61,
-    #     None
-    # ),
-    # MyButton(
-    #     "Button 62",
-    #     board.GP2,
-    #     62,
-    #     None
-    # ),
-    # MyButton(
-    #     "Button 63",
-    #     board.GP3,
-    #     63,
-    #     None
-    # ),
-    # MyButton(
-    #     "Button 64",
-    #     board.GP4,
-    #     64,
-    #     None
-    # ),
-    # MyButton(
-    #     "Button 65",
-    #     board.GP5,
-    #     65,
-    #     None
-    # ),
-    # MyButton(
-    #     "Button 66",
-    #     board.GP6,
-    #     66,
-    #     None
-    # ),
-    # MyButton(
-    #     "Button 69",
-    #     board.GP18,
-    #     69,
-    #     None
-    # )
-]
-print("ok")
-
-print("MyREncoders init...", end = " " )
-class MyREncoder:
-    name = "Encoder"
-    pinA = None
-    pinB = None
-    last_position = 0
-    encoder = None
-    value = 0
-    value_min = 0
-    value_max = 127
-    step_size = 1
-    def __init__(self, name, pinA, pinB, value_min, value_max, value = 106, step_size = 1):
-        self.name = name
-        self.pinA = pinA
-        self.pinB = pinB
-        self.value_min = value_min
-        self.value_max = value_max
-        self.step_size = step_size
-        self.value = int( self.value_min + ( ( self.value_max - self.value_min) / 2 ) )
-        self.encoder = rotaryio.IncrementalEncoder(self.pinA, self.pinB, 4)
-        
-    def setValue(self, value):
-        if value <= self.value_min:
-            self.value = self.value_min
-        elif value >= self.value_max:
-            self.value = self.value_max
-        else:
-            self.value = value
-        return self.value
-        
-    def getValue(self):
-        return self.value
-        
-    def plus(self):
-        if self.value < self.value_max:
-            self.setValue( self.value + 1 * self.step_size )
-        return self.value
-        
-    def minus(self):
-        if self.value > self.value_min:
-            self.setValue( self.value - 1 * self.step_size )
-        return self.value
-
-MyREncoders = [
-    # MyREncoder(
-    #     "Encoder",
-    #     board.GP19,
-    #     board.GP20,
-    #     0,
-    #     127,
-    #     106,
-    #     1
-    # )
-];
-print("ok")
-
-print("MyKnob init...", end = " " )
-class MyKnob:
-    name = "Knobby"
-    adc = None
-    cc_number = 0
-    cc_range = (0, 127)
-    cc_value = (0, 0)
-    cc_value_last = (0, 0)
-    channel = 0
-    def __init__(self, name, pin, cc_number, cc_range, channel):
-        self.name = name
-        self.pin = pin
-        self.cc_number = cc_number
-        self.cc_range = cc_range
-        self.adc = AnalogIn( pin )
-        self.channel = channel
-
-MyKnobs = [
-    MyKnob(
-        "Knobby ch1cc7",
-        board.GP26,
-        7,
-        (0, 127),
-        0
+    MyButton(
+        "Button 61",
+        board.GP2,
+        61,
+        None
     ),
-    MyKnob(
-        "Knobby ch2cc7",
-        board.GP27,
-        7,
-        (0, 127),
-        1
+    MyButton(
+        "Button 62",
+        board.GP3,
+        62,
+        None
+    ),
+    MyButton(
+        "Button 63",
+        board.GP4,
+        63,
+        None
+    ),
+    MyButton(
+        "Button 64",
+        board.GP6,
+        64,
+        None
+    ),
+    MyButton(
+        "Button 65",
+        board.GP7,
+        65,
+        None
+    ),
+    MyButton(
+        "Button 66",
+        board.GP8,
+        66,
+        None
     )
 ]
 print("ok")
 
 print("MUX init...", end = " " )
+
+class MyMuxControl:
+    def __init__(self, pin):
+        self.pin = pin
+        self.control = digitalio.DigitalInOut( self.pin )
+        self.control.direction = digitalio.Direction.OUTPUT
+        self.control.value = False
+
+MyMuxControls = [
+    MyMuxControl(
+        board.GP18
+    ),
+    MyMuxControl(
+        board.GP19
+    ),
+    MyMuxControl(
+        board.GP20
+    ),
+    MyMuxControl(
+        board.GP21
+    )
+]
 
 class MyMuxChannel:
     name = "Muxxy"
@@ -279,42 +204,78 @@ class MyMuxChannel:
     cc_value_last = (0, 0)
     channel = 0
     muxCh = 0
-    def __init__(self, name, pin, cc_number, cc_range, channel, muxCh):
+    def __init__(self, name, cc_number, cc_range, channel, muxCh):
         self.name = name
-        self.pin = pin
         self.cc_number = cc_number
         self.cc_range = cc_range
         self.channel = channel
         self.muxCh = muxCh
-        self.control = digitalio.DigitalInOut( self.pin )
-        self.control.direction = digitalio.Direction.OUTPUT
-        self.control.value = False
     def getAnalogValue(self):
         return readmux( self.muxCh )
 
 MyMuxChannels = [
     MyMuxChannel(
         "Muxxy01",
-        board.GP13,
         7,
         (0, 127),
-        2,
+        0,
         0
     ),
     MyMuxChannel(
         "Muxxy02",
-        board.GP12,
+        7,
+        (0, 127),
+        1,
+        1
+    ),
+    MyMuxChannel(
+        "Muxxy03",
+        7,
+        (0, 127),
+        2,
+        2
+    ),
+    MyMuxChannel(
+        "Muxxy04",
         7,
         (0, 127),
         3,
-        1
+        3
+    ),
+    MyMuxChannel(
+        "Muxxy05",
+        7,
+        (0, 127),
+        4,
+        4
+    ),
+    MyMuxChannel(
+        "Muxxy06",
+        7,
+        (0, 127),
+        5,
+        5
+    ),
+    MyMuxChannel(
+        "Muxxy07",
+        7,
+        (0, 127),
+        6,
+        6
+    ),
+    MyMuxChannel(
+        "Muxxy08",
+        7,
+        (0, 127),
+        7,
+        7
     )
 ]
 
 mux_sig_pin = board.GP28
 mux_sig = AnalogIn( mux_sig_pin )
 
-muxChannel = [
+muxChannelMatrix = [
     [0,0,0,0], # - 0
     [1,0,0,0], # - 1
     [0,1,0,0], # - 2
@@ -334,16 +295,19 @@ muxChannel = [
 ]
 
 def readmux (channel):
-    for x in range(math.ceil(len(MyMuxChannels) / 4)) :
-        val = muxChannel[channel][x]
+    for x in range(4):
+        val = muxChannelMatrix[channel][x]
         if val == 0:
             val = False
         elif val == 1:
             val = True
-        MyMuxChannels[x].control.value = val
+        MyMuxControls[x].control.value = val
     return mux_sig.value
 
 print("ok")
+
+neo.fill(GREEN)
+neo.show()
 
 print("Starting Main Loop")
 while True:
@@ -367,56 +331,6 @@ while True:
             update_display([
                 btn.name,
                 "value: released"
-            ])
-
-    for rencoder in MyREncoders:
-        current_position = rencoder.encoder.position
-        print(rencoder.encoder.position)
-        position_change = current_position - rencoder.last_position
-        if position_change > 0:
-            for _ in range(position_change):
-                rencoder.plus()
-                #print(rencoder.value)
-        elif position_change < 0:
-            for _ in range(-position_change):
-                rencoder.minus()
-                #print(rencoder.value)
-        if position_change != 0:
-            midi_usb.send(
-                ControlChange(
-                    7,
-                    rencoder.value
-                ),
-                15
-            )
-            update_display([
-                rencoder.name,
-                "value: " + str(rencoder.value)
-            ])
-        rencoder.last_position = current_position
-
-    for knob in MyKnobs:
-        knob.cc_value = range_index(
-            knob.adc.value,
-            ( knob.cc_range[1] - knob.cc_range[0] + 1 ),
-            knob.cc_value[0],
-            knob.cc_value[1],
-        )
-        if knob.cc_value != knob.cc_value_last:
-            midi_usb.send(
-                ControlChange(
-                    knob.cc_number,
-                    knob.cc_value[0] + knob.cc_range[0]
-                ),
-                knob.channel
-            )
-            knob.cc_value_last = knob.cc_value
-            #print("knob {0}".format(knob.channel))
-            led.value = True
-            update_neo( knob_neo( knob.cc_value[0] ) )
-            update_display([
-                knob.name,
-                "value: " + str(knob.cc_value[0])
             ])
             
     for ch in MyMuxChannels:
