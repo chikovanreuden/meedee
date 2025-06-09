@@ -20,6 +20,9 @@ import adafruit_midi  # MIDI protocol encoder/decoder library
 from adafruit_midi.control_change import ControlChange
 from adafruit_midi.note_off import NoteOff
 from adafruit_midi.note_on import NoteOn
+from adafruit_midi.pitch_bend import PitchBend
+from adafruit_midi.channel_pressure import ChannelPressure
+from adafruit_midi.program_change import ProgramChange
 from adafruit_debouncer import Debouncer
 from adafruit_ssd1306 import SSD1306_I2C
 import neopixel
@@ -49,6 +52,7 @@ print("ok")
 print("i2c init...", end = " " )
 i2c = busio.I2C(scl=board.GP17, sda=board.GP16)
 print("ok")
+
 print("oled init...", end = " " )
 oled = SSD1306_I2C(128, 32, i2c)
 oled.fill(0)
@@ -59,11 +63,11 @@ oled.show()
 print("ok")
 
 print("midi_usb init...", end = " " )
-# pick your USB MIDI out channel here, 1-16
-MIDI_USB_channel = 1
 midi_usb = adafruit_midi.MIDI(
     midi_out=usb_midi.ports[1],
-    out_channel=MIDI_USB_channel - 1
+    out_channel=0,
+    midi_in=usb_midi.ports[0],
+    # in_channel=(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15)
 )
 print("ok")
 
@@ -172,7 +176,7 @@ MyButtons = [
 ]
 print("ok")
 
-print("MUX init...", end = " " )
+print("MUX IN Analog 01 init...", end = " " )
 
 class MyMuxControl:
     def __init__(self, pin):
@@ -271,9 +275,8 @@ MyMuxChannels = [
         7
     )
 ]
-
-mux_sig_pin = board.GP28
-mux_sig = AnalogIn( mux_sig_pin )
+mux_in_analog_1_sig_pin = board.GP28
+mux_in_analog_1_sig = AnalogIn( mux_in_analog_1_sig_pin )
 
 muxChannelMatrix = [
     [0,0,0,0], # - 0
@@ -302,7 +305,13 @@ def readmux (channel):
         elif val == 1:
             val = True
         MyMuxControls[x].control.value = val
-    return mux_sig.value
+    return mux_in_analog_1_sig.value
+
+print("ok")
+
+print("MUX OUT Digital 01 init...", end = " " )
+
+
 
 print("ok")
 
@@ -311,6 +320,34 @@ neo.show()
 
 print("Starting Main Loop")
 while True:
+
+    #  receive midi messages
+    msg = midi_usb.receive()
+    
+    string_msg = ""
+    string_val = 0
+    if msg is not None:
+        print( msg )
+        if isinstance(msg, NoteOn):
+            string_msg = 'NoteOn'
+            string_val = str(msg.note)
+        if isinstance(msg, NoteOff):
+            string_msg = 'NoteOff'
+            string_val = str(msg.note)
+        if isinstance(msg, PitchBend):
+            string_msg = 'PitchBend'
+            string_val = str(msg.pitch_bend)
+        if isinstance(msg, ControlChange):
+            string_msg = 'ControlChange'
+            string_val = str(msg.control)
+        if isinstance(msg, ChannelPressure):
+            string_msg = 'ChannelPressure'
+            string_val = str(msg.control)
+        if isinstance(msg, ProgramChange):
+            string_msg = 'ProgramChange'
+            string_val = str(msg.control)
+        print(string_msg + " " + string_val)
+        
     for btn in MyButtons:
         btn.button.update()
         
@@ -319,14 +356,14 @@ while True:
         #else:
         #    print("pressed")
         if btn.button.fell:
-            midi_usb.send( NoteOn( btn.note, 127 ) )
+            midi_usb.send( NoteOn( btn.note, 127 ), 0 )
             # print('pressed {0}'.format(btn.note))
             update_display([
                 btn.name,
                 "value: pressed"
             ])
         if btn.button.rose:
-            midi_usb.send( NoteOff( btn.note, 0 ) )
+            midi_usb.send( NoteOff( btn.note, 0 ), 0 )
             # print('released {0}'.format(btn.note))
             update_display([
                 btn.name,
@@ -357,5 +394,5 @@ while True:
                 "value: " + str(ch.cc_value[0])
             ])
 
-    time.sleep(0.01)
+    time.sleep(0.001)
     led.value = False
