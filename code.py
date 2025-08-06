@@ -50,7 +50,7 @@ neo.show()
 print("ok")
 
 print("i2c init...", end = " " )
-i2c = busio.I2C(scl=board.GP17, sda=board.GP16)
+i2c = busio.I2C(scl=board.GP1, sda=board.GP0)
 print("ok")
 
 print("oled init...", end = " " )
@@ -122,56 +122,82 @@ def update_display(rows):
 print("MyButtons init...", end = " " )
 class MyButton:
     name = "Button"
-    pin = None,
+    gpio = None
+    pin = None
     button = None
     note = 0
     value = 0
-    def __init__(self, name, pin, note, value = 106):
+    last_pressed = 0 
+    def __init__(self, name, gpio, note, value = 106, feedback_led_pin = None):
         self.name = name
-        self.pin = pin
+        self.gpio = gpio
         self.note = note
         self.value = value
-        btn = digitalio.DigitalInOut(pin)
-        btn.direction = digitalio.Direction.INPUT
-        btn.pull = digitalio.Pull.UP
-        self.button = Debouncer(btn)
+        self.pin = digitalio.DigitalInOut(self.gpio)
+        self.pin.direction = digitalio.Direction.INPUT
+        self.pin.pull = digitalio.Pull.UP
+        self.button = Debouncer(self.pin)
+        if feedback_led_pin:
+            self.feedback_indicator_led = digitalio.DigitalInOut(feedback_led_pin)
+            self.feedback_indicator_led.direction = digitalio.Direction.OUTPUT
 
 MyButtons = [
     MyButton(
         "Button 61",
         board.GP2,
         61,
-        None
+        None,
+        board.GP10
     ),
     MyButton(
         "Button 62",
         board.GP3,
         62,
-        None
+        None,
+        board.GP11
     ),
     MyButton(
         "Button 63",
         board.GP4,
         63,
         None
+        ,
+        board.GP12
     ),
     MyButton(
         "Button 64",
-        board.GP6,
+        board.GP5,
         64,
-        None
+        None,
+        board.GP13
     ),
     MyButton(
         "Button 65",
-        board.GP7,
+        board.GP6,
         65,
-        None
+        None,
+        board.GP14
     ),
     MyButton(
         "Button 66",
-        board.GP8,
+        board.GP7,
         66,
-        None
+        None,
+        board.GP15
+    ),
+    MyButton(
+        "Button 67",
+        board.GP8,
+        67,
+        None,
+        board.GP17
+    ),
+    MyButton(
+        "Button 68",
+        board.GP9,
+        68,
+        None,
+        board.GP16
     )
 ]
 print("ok")
@@ -187,16 +213,16 @@ class MyMuxControl:
 
 MyMuxControls = [
     MyMuxControl(
-        board.GP18
-    ),
-    MyMuxControl(
-        board.GP19
+        board.GP21
     ),
     MyMuxControl(
         board.GP20
     ),
     MyMuxControl(
-        board.GP21
+        board.GP19
+    ),
+    MyMuxControl(
+        board.GP18
     )
 ]
 
@@ -320,7 +346,7 @@ neo.show()
 
 print("Starting Main Loop")
 while True:
-
+    print("****************************************")
     #  receive midi messages
     msg = midi_usb.receive()
     
@@ -331,6 +357,9 @@ while True:
         if isinstance(msg, NoteOn):
             string_msg = 'NoteOn'
             string_val = str(msg.note)
+            for btn in MyButtons:
+                if btn.note == msg.note:
+                    btn.feedback_indicator_led.value = msg.velocity != 0
         if isinstance(msg, NoteOff):
             string_msg = 'NoteOff'
             string_val = str(msg.note)
@@ -362,6 +391,7 @@ while True:
                 btn.name,
                 "value: pressed"
             ])
+            btn.last_pressed = time.monotonic()
         if btn.button.rose:
             midi_usb.send( NoteOff( btn.note, 0 ), 0 )
             # print('released {0}'.format(btn.note))
@@ -375,13 +405,15 @@ while True:
             ch.getAnalogValue(),
             ( ch.cc_range[1] - ch.cc_range[0] + 1 ),
             ch.cc_value[0],
-            ch.cc_value[1],
+            ch.cc_value[1]
         )
+        #print(ch.name + " > " + str(ch.cc_value[0]))
         if ch.cc_value != ch.cc_value_last:
+            print("channel: " + str(ch.channel) + " | number: " + str(ch.cc_number) + " | cc_value:" + str(ch.cc_value[0]))
             midi_usb.send(
                 ControlChange(
                     ch.cc_number,
-                    ch.cc_value[0] + ch.cc_range[0]
+                    ch.cc_value[0]
                 ),
                 ch.channel
             )
@@ -393,6 +425,5 @@ while True:
                 ch.name,
                 "value: " + str(ch.cc_value[0])
             ])
-
-    time.sleep(0.001)
+    #time.sleep(0.1)
     led.value = False
