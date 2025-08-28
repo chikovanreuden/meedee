@@ -1,10 +1,3 @@
-# SPDX-FileCopyrightText: 2023 John Park for Adafruit Industries
-# SPDX-License-Identifier: MIT
-
-#  Grand Central MIDI Knobs
-#  for USB MIDI and optional UART MIDI
-#  Reads analog inputs, sends out MIDI CC values
-#   with Kattni Rembor and Jan Goolsbey for range and hysteresis code
 VERSION="0.2.0"
 print("Starting v" + VERSION)
 print("Loading Modules..." , end = " " )
@@ -26,10 +19,80 @@ from adafruit_midi.program_change import ProgramChange
 from adafruit_debouncer import Debouncer
 from adafruit_ssd1306 import SSD1306_I2C
 import neopixel
-import math
+
 print("ok")
 
 print("Loading Program")
+
+print("Defining Functions... ", end = " ")
+
+# SPDX SECTION START
+# SPDX-FileCopyrightText: 2023 John Park for Adafruit Industries
+# SPDX-License-Identifier: MIT
+
+#  Grand Central MIDI Knobs
+#  for USB MIDI and optional UART MIDI
+#  Reads analog inputs, sends out MIDI CC values
+#   with Kattni Rembor and Jan Goolsbey for range and hysteresis code
+
+#  range_index converts an analog value (ctl) to an indexed integer
+#  Input is masked to 8 bits to reduce noise then a scaled hysteresis offset
+#  is applied. The helper returns new index value (idx) and input
+#  hysteresis offset (offset) based on the number of control slices (ctrl_max).
+def range_index(ctl, ctrl_max, old_idx, offset):
+    if (ctl + offset > 65535) or (ctl + offset < 0):
+        offset = 0
+    idx = int(map_range((ctl + offset) & 0xFF00, 1200, 65500, 0, ctrl_max))
+    if idx != old_idx:  # if index changed, adjust hysteresis offset
+        # offset is 25% of the control slice (65536/ctrl_max)
+        offset = int(
+            0.25 * sign(idx - old_idx) * (65535 / ctrl_max)
+        )  # edit 0.25 to adjust slices
+    return idx, offset
+
+def sign(x):  # determine the sign of x
+    return 1 if x >= 0 else 0
+# SPDX END
+
+def readmux (channel):
+    for x in range(4):
+        val = muxChannelMatrix[channel][x]
+        if val == 0:
+            val = False
+        elif val == 1:
+            val = True
+        MyMuxControls[x].control.value = val
+    return mux_in_analog_1_sig.value
+
+
+        
+def knob_neo( value ):
+    if not value:
+        return (0,0,0)
+    red = 0
+    green = 255
+    blue = 0
+    if value <= 63:
+        red = ( 256 / 64 ) * value
+        green = 255
+    elif value > 63:
+        red = 255
+        green = 255 - (( 256 / 64 ) * (value-64))
+    # print((red, green, blue));
+    return (red, green, blue)
+
+def update_neo( newValue ):
+    neo.fill( newValue )
+    neo.show()
+
+def update_display(rows):
+    oled.fill(0)
+    row_count = 0
+    for row in rows:
+        oled.text(row, 0, row_count, 1)
+        row_count += 10
+    oled.show()
+print("ok")
 
 print("neopixel init...", end = " " )
 pixel_pin = board.GP23
@@ -73,51 +136,6 @@ print("ok")
 
 led = digitalio.DigitalInOut(board.GP25)  # activity indicator
 led.direction = digitalio.Direction.OUTPUT
-
-#  range_index converts an analog value (ctl) to an indexed integer
-#  Input is masked to 8 bits to reduce noise then a scaled hysteresis offset
-#  is applied. The helper returns new index value (idx) and input
-#  hysteresis offset (offset) based on the number of control slices (ctrl_max).
-def range_index(ctl, ctrl_max, old_idx, offset):
-    if (ctl + offset > 65535) or (ctl + offset < 0):
-        offset = 0
-    idx = int(map_range((ctl + offset) & 0xFF00, 1200, 65500, 0, ctrl_max))
-    if idx != old_idx:  # if index changed, adjust hysteresis offset
-        # offset is 25% of the control slice (65536/ctrl_max)
-        offset = int(
-            0.25 * sign(idx - old_idx) * (65535 / ctrl_max)
-        )  # edit 0.25 to adjust slices
-    return idx, offset
-
-def sign(x):  # determine the sign of x
-    return 1 if x >= 0 else 0
-        
-def knob_neo( value ):
-    if not value:
-        return (0,0,0)
-    red = 0
-    green = 255
-    blue = 0
-    if value <= 63:
-        red = ( 256 / 64 ) * value
-        green = 255
-    elif value > 63:
-        red = 255
-        green = 255 - (( 256 / 64 ) * (value-64))
-    # print((red, green, blue));
-    return (red, green, blue)
-
-def update_neo( newValue ):
-    neo.fill( newValue )
-    neo.show()
-
-def update_display(rows):
-    oled.fill(0)
-    row_count = 0
-    for row in rows:
-        oled.text(row, 0, row_count, 1)
-        row_count += 10
-    oled.show()
     
 print("MyButtons init...", end = " " )
 class MyButton:
@@ -323,22 +341,6 @@ muxChannelMatrix = [
     [1,1,1,1] # - 15
 ]
 
-def readmux (channel):
-    for x in range(4):
-        val = muxChannelMatrix[channel][x]
-        if val == 0:
-            val = False
-        elif val == 1:
-            val = True
-        MyMuxControls[x].control.value = val
-    return mux_in_analog_1_sig.value
-
-print("ok")
-
-print("MUX OUT Digital 01 init...", end = " " )
-
-
-
 print("ok")
 
 neo.fill(GREEN)
@@ -346,36 +348,36 @@ neo.show()
 
 print("Starting Main Loop")
 while True:
-    print("****************************************")
+    #print("****************************************")
     #  receive midi messages
     msg = midi_usb.receive()
     
-    string_msg = ""
-    string_val = 0
+    # string_msg = ""
+    # string_val = 0
     if msg is not None:
-        print( msg )
+        #print( msg )
         if isinstance(msg, NoteOn):
-            string_msg = 'NoteOn'
-            string_val = str(msg.note)
+            # string_msg = 'NoteOn'
+            # string_val = str(msg.note)
             for btn in MyButtons:
                 if btn.note == msg.note:
                     btn.feedback_indicator_led.value = msg.velocity != 0
-        if isinstance(msg, NoteOff):
-            string_msg = 'NoteOff'
-            string_val = str(msg.note)
-        if isinstance(msg, PitchBend):
-            string_msg = 'PitchBend'
-            string_val = str(msg.pitch_bend)
-        if isinstance(msg, ControlChange):
-            string_msg = 'ControlChange'
-            string_val = str(msg.control)
-        if isinstance(msg, ChannelPressure):
-            string_msg = 'ChannelPressure'
-            string_val = str(msg.control)
-        if isinstance(msg, ProgramChange):
-            string_msg = 'ProgramChange'
-            string_val = str(msg.control)
-        print(string_msg + " " + string_val)
+        # if isinstance(msg, NoteOff):
+        #     string_msg = 'NoteOff'
+        #     string_val = str(msg.note)
+        # if isinstance(msg, PitchBend):
+        #     string_msg = 'PitchBend'
+        #     string_val = str(msg.pitch_bend)
+        # if isinstance(msg, ControlChange):
+        #     string_msg = 'ControlChange'
+        #     string_val = str(msg.control)
+        # if isinstance(msg, ChannelPressure):
+        #     string_msg = 'ChannelPressure'
+        #     string_val = str(msg.control)
+        # if isinstance(msg, ProgramChange):
+        #     string_msg = 'ProgramChange'
+        #     string_val = str(msg.control)
+        # print(string_msg + " " + string_val)
         
     for btn in MyButtons:
         btn.button.update()
@@ -409,7 +411,7 @@ while True:
         )
         #print(ch.name + " > " + str(ch.cc_value[0]))
         if ch.cc_value != ch.cc_value_last:
-            print("channel: " + str(ch.channel) + " | number: " + str(ch.cc_number) + " | cc_value:" + str(ch.cc_value[0]))
+            #print("channel: " + str(ch.channel) + " | number: " + str(ch.cc_number) + " | cc_value:" + str(ch.cc_value[0]))
             midi_usb.send(
                 ControlChange(
                     ch.cc_number,
